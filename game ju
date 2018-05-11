@@ -5,6 +5,7 @@ Created on Fri May 11 11:27:23 2018
 
 @author: fred
 """
+#personagem inicio, andando e pulando, paredes limitadas
 
 import pygame
 pygame.init()
