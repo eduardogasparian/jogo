@@ -9,6 +9,7 @@ from random import uniform, choice, randint, random
 from settings import *
 from tilemap import collide_hit_rect
 import pytweening as tween
+from itertools import chain
 vec = pg.math.Vector2
 
 
@@ -34,7 +35,7 @@ def collide_with_walls(sprite, group, dir):
 
 class Player(pg.sprite.Sprite):
     def __init__(self, game, x, y):
-         self._layer = PLAYER_LAYER
+        self._layer = PLAYER_LAYER
         self.groups = game.all_sprites
         pg.sprite.Sprite.__init__(self, self.groups)
         self.game = game
@@ -48,7 +49,8 @@ class Player(pg.sprite.Sprite):
         self.rot = 0
         self.last_shot = 0
         self.health = PLAYER_HEALTH
-        self.weapon = 'shotgun'
+        self.damaged = False
+  
 
     def get_keys(self):
         self.rot_speed = 0
@@ -63,29 +65,31 @@ class Player(pg.sprite.Sprite):
         if keys[pg.K_DOWN] or keys[pg.K_s]:
             self.vel = vec(-PLAYER_SPEED / 2, 0).rotate(-self.rot)
         if keys[pg.K_SPACE]:
-            self.shoot()
+            now = pg.time.get_ticks()
+            if now - self.last_shot > BULLET_RATE:
+                self.last_shot = now
+                dir = vec(1, 0).rotate(-self.rot)
+                pos = self.pos + BARREL_OFFSET.rotate(-self.rot)
+                Bullet(self.game, pos, dir)
+                self.vel = vec(-KICKBACK, 0).rotate(-self.rot)
+                choice(self.game.weapon_sounds['gun']).play()
+                MuzzleFlash(self.game, pos)
             
-    def shoot(self):
-        now = pg.time.get_ticks()
-        if now - self.last_shot > WEAPONS[self.weapon]['rate']:
-            self.last_shot = now
-            dir = vec(1, 0).rotate(-self.rot)
-            pos = self.pos + BARREL_OFFSET.rotate(-self.rot)
-            self.vel = vec(-WEAPONS[self.weapon]['kickback'], 0).rotate(-self.rot)
-            for i in range(WEAPONS[self.weapon]['bullet_count']):
-                spread = uniform(-WEAPONS[self.weapon]['spread'], WEAPONS[self.weapon]['spread'])
-                Bullet(self.game, pos, dir.rotate(spread))
-                snd = choice(self.game.weapon_sounds[self.weapon])
-                if snd.get_num_channels() > 2:
-                    snd.stop()
-                snd.play()
-            MuzzleFlash(self.game, pos)
-        
+     
+    def hit(self):
+        self.damaged = True
+        self.damage_alpha = chain(DAMAGE_ALPHA * 4)       
+ 
 
     def update(self):
         self.get_keys()
         self.rot = (self.rot + self.rot_speed * self.game.dt) % 360
         self.image = pg.transform.rotate(self.game.player_img, self.rot)
+        if self.damaged:
+            try:
+                self.image.fill((255, 255, 255, next(self.damage_alpha)), special_flags=pg.BLEND_RGBA_MULT)
+            except:
+                self.damaged = False
         self.rect = self.image.get_rect()
         self.rect.center = self.pos
         self.pos += self.vel * self.game.dt
@@ -126,7 +130,27 @@ class Mob(pg.sprite.Sprite):
                 dist = self.pos - mob.pos
                 if 0 < dist.length() < AVOID_RADIUS:
                     self.acc += dist.normalize()
-
+    
+    def avoid_monstros(self):
+        for monstro in self.game.monstros:
+            if monstro != self:
+                dist = self.pos - monstro.pos
+                if 0 < dist.length() < AVOID_RADIUS_MONSTRO:
+                    self.acc += dist.normalize()
+    def avoid_criaturas(self):
+        for criatura in self.game.criaturas:
+            if criatura != self:
+                dist = self.pos - criatura.pos
+                if 0 < dist.length() < AVOID_RADIUS_CRIATURA:
+                    self.acc += dist.normalize()
+    
+    def avoid_esqueletos(self):
+        for esqueleto in self.game.esqueletos:
+            if esqueleto != self:
+                dist = self.pos - esqueleto.pos
+                if 0 < dist.length() < AVOID_RADIUS_ESQUELETO:
+                    self.acc += dist.normalize()
+    
     def update(self):
         target_dist = self.target.pos - self.pos
         if target_dist.length_squared() < DETECT_RADIUS**2:
@@ -137,6 +161,9 @@ class Mob(pg.sprite.Sprite):
             self.rect.center = self.pos
             self.acc = vec(1, 0).rotate(-self.rot)
             self.avoid_mobs()
+            self.avoid_monstros()
+            self.avoid_criaturas()
+            self.avoid_esqueletos()
             self.acc.scale_to_length(self.speed)
             self.acc += self.vel * -1
             self.vel += self.acc * self.game.dt
@@ -164,6 +191,281 @@ class Mob(pg.sprite.Sprite):
         if self.health < MOB_HEALTH:
             pg.draw.rect(self.image, col, self.health_bar)
 
+#novo inimigo
+            
+class Monstro(pg.sprite.Sprite):
+    def __init__(self, game, x, y):
+        self._layer = MONSTRO_LAYER
+        self.groups = game.all_sprites, game.monstros
+        pg.sprite.Sprite.__init__(self, self.groups)
+        self.game = game
+        self.image = game.monstro_img.copy()
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        self.hit_rect = MONSTRO_HIT_RECT.copy()
+        self.hit_rect.center = self.rect.center
+        self.pos = vec(x, y)
+        self.vel = vec(0, 0)
+        self.acc = vec(0, 0)
+        self.rect.center = self.pos
+        self.rot = 0
+        self.health = MONSTRO_HEALTH
+        self.speed = MONSTRO_SPEED
+        self.target = game.player
+
+    def avoid_monstros(self):
+        for monstro in self.game.monstros:
+            if monstro != self:
+                dist = self.pos - monstro.pos
+                if 0 < dist.length() < AVOID_RADIUS_MONSTRO:
+                    self.acc += dist.normalize()
+    
+    def avoid_mobs(self):
+        for mob in self.game.mobs:
+            if mob != self:
+                dist = self.pos - mob.pos
+                if 0 < dist.length() < AVOID_RADIUS_MONSTRO:
+                    self.acc += dist.normalize()
+    
+    def avoid_criaturas(self):
+        for criatura in self.game.criaturas:
+            if criatura != self:
+                dist = self.pos - criatura.pos
+                if 0 < dist.length() < AVOID_RADIUS_CRIATURA:
+                    self.acc += dist.normalize()
+    
+    def avoid_esqueletos(self):
+        for esqueleto in self.game.esqueletos:
+            if esqueleto != self:
+                dist = self.pos - esqueleto.pos
+                if 0 < dist.length() < AVOID_RADIUS_ESQUELETO:
+                    self.acc += dist.normalize()
+
+    def update(self):
+        target_dist = self.target.pos - self.pos
+        if target_dist.length_squared() < DETECT_RADIUS**2:
+            if random() < 0.002:
+                choice(self.game.zombie_moan_sounds).play()
+            self.rot = target_dist.angle_to(vec(1, 0))
+            self.image = pg.transform.rotate(self.game.monstro_img, self.rot)
+            self.rect.center = self.pos
+            self.acc = vec(1, 0).rotate(-self.rot)
+            self.avoid_monstros()
+            self.avoid_mobs()
+            self.avoid_criaturas()
+            self.avoid_esqueletos()
+            self.acc.scale_to_length(self.speed)
+            self.acc += self.vel * -1
+            self.vel += self.acc * self.game.dt
+            self.pos += self.vel * self.game.dt + 0.5 * self.acc * self.game.dt ** 2
+            self.hit_rect.centerx = self.pos.x
+            collide_with_walls(self, self.game.walls, 'x')
+            self.hit_rect.centery = self.pos.y
+            collide_with_walls(self, self.game.walls, 'y')
+            self.rect.center = self.hit_rect.center
+        if self.health <= 0:
+            choice(self.game.zombie_hit_sounds).play()
+            self.kill()
+            self.game.map_img.blit(self.game.splat, self.pos - vec(32, 32))
+
+
+    def draw_health(self):
+        if self.health > 600:
+            col = GREEN
+        elif self.health > 300:
+            col = YELLOW
+        else:
+            col = RED
+        width = int(self.rect.width * self.health / MONSTRO_HEALTH)
+        self.health_bar = pg.Rect(0, 0, width, 7)
+        if self.health < MONSTRO_HEALTH:
+            pg.draw.rect(self.image, col, self.health_bar)
+
+
+
+class Criatura(pg.sprite.Sprite):
+    def __init__(self, game, x, y):
+        self._layer = CRIATURA_LAYER
+        self.groups = game.all_sprites, game.criaturas
+        pg.sprite.Sprite.__init__(self, self.groups)
+        self.game = game
+        self.image = game.criatura_img.copy()
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        self.hit_rect = CRIATURA_HIT_RECT.copy()
+        self.hit_rect.center = self.rect.center
+        self.pos = vec(x, y)
+        self.vel = vec(0, 0)
+        self.acc = vec(0, 0)
+        self.rect.center = self.pos
+        self.rot = 0
+        self.health = CRIATURA_HEALTH
+        self.speed = CRIATURA_SPEED
+        self.target = game.player
+
+    def avoid_monstros(self):
+        for monstro in self.game.monstros:
+            if monstro != self:
+                dist = self.pos - monstro.pos
+                if 0 < dist.length() < AVOID_RADIUS_MONSTRO:
+                    self.acc += dist.normalize()
+    
+    def avoid_mobs(self):
+        for mob in self.game.mobs:
+            if mob != self:
+                dist = self.pos - mob.pos
+                if 0 < dist.length() < AVOID_RADIUS_MONSTRO:
+                    self.acc += dist.normalize()
+     
+    def avoid_criaturas(self):
+        for criatura in self.game.criaturas:
+            if criatura != self:
+                dist = self.pos - criatura.pos
+                if 0 < dist.length() < AVOID_RADIUS_CRIATURA:
+                    self.acc += dist.normalize()
+    
+    def avoid_esqueletos(self):
+        for esqueleto in self.game.esqueletos:
+            if esqueleto != self:
+                dist = self.pos - esqueleto.pos
+                if 0 < dist.length() < AVOID_RADIUS_ESQUELETO:
+                    self.acc += dist.normalize()
+    
+    def update(self):
+        target_dist = self.target.pos - self.pos
+        if target_dist.length_squared() < DETECT_RADIUS**2:
+            if random() < 0.002:
+                choice(self.game.zombie_moan_sounds).play()
+            self.rot = target_dist.angle_to(vec(1, 0))
+            self.image = pg.transform.rotate(self.game.criatura_img, self.rot)
+            self.rect.center = self.pos
+            self.acc = vec(1, 0).rotate(-self.rot)
+            self.avoid_monstros()
+            self.avoid_mobs()
+            self.avoid_criaturas()
+            self.avoid_esqueletos()
+            self.acc.scale_to_length(self.speed)
+            self.acc += self.vel * -1
+            self.vel += self.acc * self.game.dt
+            self.pos += self.vel * self.game.dt + 0.5 * self.acc * self.game.dt ** 2
+            self.hit_rect.centerx = self.pos.x
+            collide_with_walls(self, self.game.walls, 'x')
+            self.hit_rect.centery = self.pos.y
+            collide_with_walls(self, self.game.walls, 'y')
+            self.rect.center = self.hit_rect.center
+        if self.health <= 0:
+            choice(self.game.zombie_hit_sounds).play()
+            self.kill()
+            self.game.map_img.blit(self.game.splat, self.pos - vec(32, 32))
+
+
+    def draw_health(self):
+        if self.health > 600:
+            col = GREEN
+        elif self.health > 300:
+            col = YELLOW
+        else:
+            col = RED
+        width = int(self.rect.width * self.health / CRIATURA_HEALTH)
+        self.health_bar = pg.Rect(0, 0, width, 7)
+        if self.health < CRIATURA_HEALTH:
+            pg.draw.rect(self.image, col, self.health_bar)
+
+
+
+
+
+class Esqueleto(pg.sprite.Sprite):
+    def __init__(self, game, x, y):
+        self._layer = ESQUELETO_LAYER
+        self.groups = game.all_sprites, game.esqueletos
+        pg.sprite.Sprite.__init__(self, self.groups)
+        self.game = game
+        self.image = game.esqueleto_img.copy()
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        self.hit_rect = ESQUELETO_HIT_RECT.copy()
+        self.hit_rect.center = self.rect.center
+        self.pos = vec(x, y)
+        self.vel = vec(0, 0)
+        self.acc = vec(0, 0)
+        self.rect.center = self.pos
+        self.rot = 0
+        self.health = ESQUELETO_HEALTH
+        self.speed = ESQUELETO_SPEED
+        self.target = game.player
+
+    def avoid_monstros(self):
+        for monstro in self.game.monstros:
+            if monstro != self:
+                dist = self.pos - monstro.pos
+                if 0 < dist.length() < AVOID_RADIUS_MONSTRO:
+                    self.acc += dist.normalize()
+    
+    def avoid_mobs(self):
+        for mob in self.game.mobs:
+            if mob != self:
+                dist = self.pos - mob.pos
+                if 0 < dist.length() < AVOID_RADIUS_MONSTRO:
+                    self.acc += dist.normalize()
+    def avoid_criaturas(self):
+        for criatura in self.game.criaturas:
+            if criatura != self:
+                dist = self.pos - criatura.pos
+                if 0 < dist.length() < AVOID_RADIUS_CRIATURA:
+                    self.acc += dist.normalize()
+    def avoid_esqueletos(self):
+        for esqueleto in self.game.esqueletos:
+            if esqueleto != self:
+                dist = self.pos - esqueleto.pos
+                if 0 < dist.length() < AVOID_RADIUS_ESQUELETO:
+                    self.acc += dist.normalize()
+
+
+    def update(self):
+        target_dist = self.target.pos - self.pos
+        if target_dist.length_squared() < DETECT_RADIUS**2:
+            if random() < 0.002:
+                choice(self.game.zombie_moan_sounds).play()
+            self.rot = target_dist.angle_to(vec(1, 0))
+            self.image = pg.transform.rotate(self.game.esqueleto_img, self.rot)
+            self.rect.center = self.pos
+            self.acc = vec(1, 0).rotate(-self.rot)
+            self.avoid_monstros()
+            self.avoid_mobs()
+            self.avoid_criaturas()
+            self.avoid_esqueletos()
+            self.acc.scale_to_length(self.speed)
+            self.acc += self.vel * -1
+            self.vel += self.acc * self.game.dt
+            self.pos += self.vel * self.game.dt + 0.5 * self.acc * self.game.dt ** 2
+            self.hit_rect.centerx = self.pos.x
+            collide_with_walls(self, self.game.walls, 'x')
+            self.hit_rect.centery = self.pos.y
+            collide_with_walls(self, self.game.walls, 'y')
+            self.rect.center = self.hit_rect.center
+        if self.health <= 0:
+            choice(self.game.zombie_hit_sounds).play()
+            self.kill()
+            self.game.map_img.blit(self.game.splat, self.pos - vec(32, 32))
+
+
+    def draw_health(self):
+        if self.health > 600:
+            col = GREEN
+        elif self.health > 300:
+            col = YELLOW
+        else:
+            col = RED
+        width = int(self.rect.width * self.health / ESQUELETO_HEALTH)
+        self.health_bar = pg.Rect(0, 0, width, 7)
+        if self.health < ESQUELETO_HEALTH:
+            pg.draw.rect(self.image, col, self.health_bar)
+
+
+
+
+
 class Bullet(pg.sprite.Sprite):
     def __init__(self, game, pos, dir):
         self._layer = BULLET_LAYER
@@ -184,7 +486,7 @@ class Bullet(pg.sprite.Sprite):
         self.rect.center = self.pos
         if pg.sprite.spritecollideany(self, self.game.walls):
             self.kill()
-        if pg.time.get_ticks() - self.spawn_time > WEAPONS[self.game.player.weapon]['bullet_lifetime']: 
+        if pg.time.get_ticks() - self.spawn_time > BULLET_LIFETIME:
             self.kill()
 
 class Obstacle(pg.sprite.Sprite):

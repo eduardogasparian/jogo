@@ -43,40 +43,35 @@ MOB_HEALTH = 100
 MOB_DAMAGE = 10
 MOB_KNOCKBACK = 20
 AVOID_RADIUS = 50
-DETECT_RADIUS = 10000000000000000000000000000
+DETECT_RADIUS = 1000
 
 # Status da arma
 BULLET_IMG = 'bullet.png'
-WEAPONS = {}
-WEAPONS['pistol'] = {'bullet_speed': 500,
-                     'bullet_lifetime': 1000,
-                     'rate': 250,
-                     'kickback': 200,
-                     'spread': 5,
-                     'damage': 10,
-                     'bullet_size': 'lg',
-                     'bullet_count': 1}
-WEAPONS['shotgun'] = {'bullet_speed': 400,
-                      'bullet_lifetime': 500,
-                      'rate': 900,
-                      'kickback': 300,
-                      'spread': 20,
-                      'damage': 5,
-                      'bullet_size': 'sm',
-                      'bullet_count': 12}   
+BULLET_IMG = 'bullet.png'
+BULLET_SPEED = 500
+BULLET_LIFETIME = 1000
+BULLET_RATE = 150
+KICKBACK = 200
+GUN_SPREAD = 5
+BULLET_DAMAGE = 10
 
 
-#efeitos de tiro
+#efeitos
 
 MUZZLE_FLASHES = ['whitePuff15.png', 'whitePuff16.png', 'whitePuff17.png',
                   'whitePuff18.png']
 FLASH_DURATION = 50
 SPLAT = 'splat green.png'
+DAMAGE_ALPHA = [i for i in range(0, 255, 55)]
 # Layers
 WALL_LAYER = 1
 PLAYER_LAYER = 2
 BULLET_LAYER = 3
 MOB_LAYER = 2
+MONSTRO_LAYER = 2
+CRIATURA_LAYER=2
+ESQUELETO_LAYER=2
+
 EFFECTS_LAYER = 4   
 ITEMS_LAYER = 1
 # Itens
@@ -85,6 +80,37 @@ HEALTH_PACK_AMOUNT = 20
 BOB_RANGE = 15
 BOB_SPEED = 0.4
 
+#atributos monstro
+MONSTRO_IMG = 'monstro.png'
+MONSTRO_SPEED = 75
+MONSTRO_HIT_RECT = pg.Rect(0, 0, 30, 30)
+MONSTRO_HEALTH = 1000
+MONSTRO_DAMAGE = 40
+MONSTRO_KNOCKBACK = 30
+AVOID_RADIUS_MONSTRO = 100
+DETECT_RADIUS = 1000
+
+#atributos CRIATURA
+CRIATURA_IMG = 'dragao.png'
+CRIATURA_SPEED = 100
+CRIATURA_HIT_RECT = pg.Rect(0, 0, 30, 30)
+CRIATURA_HEALTH = 450
+CRIATURA_DAMAGE = 20
+CRIATURA_KNOCKBACK = 30
+AVOID_RADIUS_CRIATURA = 100
+DETECT_RADIUS = 1000
+
+#atributos esqueleto
+ESQUELETO_IMG = 'esqueleto.png'
+ESQUELETO_SPEED = 120
+ESQUELETO_HIT_RECT = pg.Rect(0, 0, 30, 30)
+ESQUELETO_HEALTH = 300
+ESQUELETO_DAMAGE = 15
+ESQUELETO_KNOCKBACK = 15
+AVOID_RADIUS_ESQUELETO = 100
+DETECT_RADIUS = 1000
+
+# link esqueleto https://br.pinterest.com/pin/554646510341864204/
 
 # Sounds
 BG_MUSIC = 'espionage.ogg'
@@ -92,10 +118,10 @@ PLAYER_HIT_SOUNDS = ['pain/8.wav', 'pain/9.wav', 'pain/10.wav', 'pain/11.wav']
 ZOMBIE_MOAN_SOUNDS = ['brains2.wav', 'brains3.wav', 'zombie-roar-1.wav', 'zombie-roar-2.wav',
                       'zombie-roar-3.wav', 'zombie-roar-5.wav', 'zombie-roar-6.wav', 'zombie-roar-7.wav']
 ZOMBIE_HIT_SOUNDS = ['splat-15.wav']
-WEAPON_SOUNDS = {'pistol': ['shotgun.wav'],
-                 'shotgun': ['shotgun.wav']}
+WEAPON_SOUNDS = ['shotgun.wav']
 EFFECTS_SOUNDS = {'level_start': 'level_start.wav',
                   'health_up': 'health_pack.wav'}
+
 
 
 
